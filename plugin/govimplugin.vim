@@ -1,17 +1,7 @@
-let s:channel = ""
+let g:channel = "" " TODO remove global scope
 let s:timer = ""
 let s:plugindir = "/home/tom/src/govimplugin"
 
-let opts = {"in_mode": "json", "out_mode": "json", "err_mode": "json", "callback": function("s:define"), "timeout": 30000}
-if $GOVIMTEST_SOCKET != ""
-  let s:channel = ch_open($GOVIMTEST_SOCKET, opts)
-else
-  let targetbin = s:install()
-  let opts.exit_cb = function("s:govimExit")
-  let job = job_start(targetbin, opts)
-  let s:channel = job_getchannel(job)
-	echomsg "govimplugin started"
-endif
 
 func s:install()
 	let oldpath = getcwd()
@@ -45,3 +35,27 @@ func s:define(channel, msg)
   endtry
   call ch_sendexpr(a:channel, l:resp)
 endfunc
+
+function s:pluginExit(job, exitstatus)
+  if a:exitstatus != 0
+    let s:govim_status = "failed"
+  else
+    let s:govim_status = "exited"
+  endif
+  "for i in s:loadStatusCallbacks
+  "  call call(i, [s:govim_status])
+  "endfor
+  if a:exitstatus != 0
+    throw "govim plugin died :("
+  endif
+endfunction
+
+let opts = {"in_mode": "json", "out_mode": "json", "err_mode": "json", "callback": function("s:define"), "timeout": 30000}
+if $GOVIMTEST_SOCKET != ""
+  let g:channel = ch_open($GOVIMTEST_SOCKET, opts)
+else
+  let targetbin = s:install()
+  let opts.exit_cb = function("s:pluginExit")
+  let job = job_start(targetbin, opts)
+  let g:channel = job_getchannel(job)
+endif
